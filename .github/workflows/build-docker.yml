@@ -1,4 +1,4 @@
-name: Build and deploy to AWS
+name: Usuario Deploy
 
 on:
   push:
@@ -7,14 +7,19 @@ on:
     paths:
       - "Dockerfile"
       - "src/**"
-
   workflow_dispatch:
 
+env:
+  ECS_CLUSTER: smartlogix-cluster
+  ECS_SERVICE: usuario-service
+  TASK_FAMILY: task-usuario
+
 jobs:
-  publish-image:
+  deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
@@ -29,42 +34,53 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: build .jar file
+      - name: Build JAR
         run: |
           chmod +x ./mvnw
           ./mvnw clean package -DskipTests
 
       - name: Build Docker image
         run: |
-          docker build -t usuarios:latest .
-          docker tag usuarios:latest ${{ secrets.ECR_REPO_URL_API_USUARIOS }}:latest
+          docker build -t usuario:latest .
+          docker tag usuario:latest ${{ secrets.ECR_REPO_URL_API_USUARIO }}:latest
 
       - name: Push image to ECR
         run: |
-          docker push ${{ secrets.ECR_REPO_URL_API_USUARIOS }}:latest
+          docker push ${{ secrets.ECR_REPO_URL_API_USUARIO }}:latest
 
-      - name: Create SSH key
+      - name: Render task definition
+        env:
+          ECR_REPO_URL_API_USUARIO: ${{ secrets.ECR_REPO_URL_API_USUARIO }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          RDS_ENDPOINT: ${{ secrets.RDS_ENDPOINT }}
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
         run: |
-          echo "${{ secrets.EC2_SSH_KEY }}" > key.pem
-          chmod 400 key.pem
+          export LAB_ROLE_ARN="arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/LabRole"
+          envsubst '$ECR_REPO_URL_API_USUARIO $AWS_REGION $RDS_ENDPOINT $MYSQL_ROOT_PASSWORD $LAB_ROLE_ARN' \
+            < aws/taskdef-usuario.json > taskdef.json
 
-      - name: Deploy API Usuario to Private EC2
+      - name: Register task definition
         run: |
-          ssh -o StrictHostKeyChecking=no \
-          -i key.pem \
-          ec2-user@${{ secrets.EC2_API_GATEWAY_PUBLIC_IP }} \
-          "ssh -o StrictHostKeyChecking=no \
-          -i ~/DevOps.pem \
-          ec2-user@${{ secrets.EC2_API_USUARIOS_PRIVATE_IP }} \
-          'aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 089485767547.dkr.ecr.us-east-1.amazonaws.com && \
-          docker pull ${{ secrets.ECR_REPO_URL_API_USUARIOS }}:latest && \
-          docker rm -f usuarios || true && \
-          docker run -d \
-          -p 8081:8081 \
-          -e GATEWAY_API_URL=http://${{ secrets.GATEWAY_API_URL }} \
-          -e SPRING_DATASOURCE_URL=jdbc:mysql://${{ secrets.EC2_DB_PRIVATE_IP }}:3306/db_usuarios \
-          -e SPRING_DATASOURCE_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }} \
-          --name usuarios \
-          --restart unless-stopped \
-          ${{ secrets.ECR_REPO_URL_API_USUARIOS }}:latest \
-          && docker image prune -af'"
+          aws ecs register-task-definition \
+            --cli-input-json file://taskdef.json \
+            --query 'taskDefinition.{family:family,revision:revision}'
+
+      - name: Deploy to ECS
+        run: |
+          SERVICE_STATUS=$(aws ecs describe-services \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_SERVICE \
+            --query 'services[0].status' --output text 2>/dev/null || echo "MISSING")
+
+          if [ "$SERVICE_STATUS" = "ACTIVE" ]; then
+            aws ecs update-service \
+              --cluster $ECS_CLUSTER \
+              --service $ECS_SERVICE \
+              --force-new-deployment \
+              --query 'service.{service:serviceName,taskDefinition:taskDefinition}'
+            echo "Waiting for service to stabilize..."
+            aws ecs wait services-stable --cluster $ECS_CLUSTER --services $ECS_SERVICE
+          else
+            echo "Service $ECS_SERVICE does not exist yet."
+            echo "Image was pushed. Create the service following AWS_SETUP.md, then this step will deploy on the next run."
+          fi
