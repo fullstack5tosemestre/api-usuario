@@ -1,0 +1,31 @@
+{
+  "family": "task-usuario",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "taskRoleArn": "$LAB_ROLE_ARN",
+  "executionRoleArn": "$LAB_ROLE_ARN",
+  "containerDefinitions": [
+    {
+      "name": "usuario",
+      "image": "$ECR_REPO_URL_API_USUARIO:latest",
+      "portMappings": [
+        { "name": "usuario-8081", "containerPort": 8081, "protocol": "tcp" }
+      ],
+      "environment": [
+        { "name": "SPRING_DATASOURCE_URL",      "value": "jdbc:mysql://$RDS_ENDPOINT:3306/db_usuarios" },
+        { "name": "SPRING_DATASOURCE_USERNAME", "value": "admin" },
+        { "name": "SPRING_DATASOURCE_PASSWORD", "value": "$MYSQL_ROOT_PASSWORD" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/task-usuario",
+          "awslogs-region": "$AWS_REGION",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}
