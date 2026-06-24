@@ -20,7 +20,7 @@
             "environment": [
                 {
                     "name": "SPRING_DATASOURCE_URL",
-                    "value": "jdbc:mysql://$RDS_ENDPOINT:3306/db_usuarios"
+                    "value": "jdbc:mysql://$RDS_ENDPOINT:3306/db_usuarios?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true"
                 },
                 { "name": "SPRING_DATASOURCE_USERNAME", "value": "admin" },
                 {
