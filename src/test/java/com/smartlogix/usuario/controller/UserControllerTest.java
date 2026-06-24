@@ -22,7 +22,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+import com.smartlogix.usuario.dto.ProductDTO;
+
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -58,7 +61,7 @@ class UserControllerTest {
         when(userService.findAll()).thenReturn(
                 List.of(sampleUser(1L, "Ana", "Torres", "11111111-1")));
 
-        mockMvc.perform(get("/api/v1/usuarios"))
+        mockMvc.perform(get("/api/v1/users"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].nombre").value("Ana"));
     }
@@ -67,7 +70,7 @@ class UserControllerTest {
     void getAllReturnsNoContentWhenEmpty() throws Exception {
         when(userService.findAll()).thenReturn(Collections.emptyList());
 
-        mockMvc.perform(get("/api/v1/usuarios"))
+        mockMvc.perform(get("/api/v1/users"))
                 .andExpect(status().isNoContent());
     }
 
@@ -76,7 +79,7 @@ class UserControllerTest {
         when(userService.findById(1L))
                 .thenReturn(Optional.of(sampleUser(1L, "Ana", "Torres", "11111111-1")));
 
-        mockMvc.perform(get("/api/v1/usuarios/1"))
+        mockMvc.perform(get("/api/v1/users/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1));
     }
@@ -85,7 +88,7 @@ class UserControllerTest {
     void getByIdReturnsNotFoundWhenMissing() throws Exception {
         when(userService.findById(99L)).thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/api/v1/usuarios/99"))
+        mockMvc.perform(get("/api/v1/users/99"))
                 .andExpect(status().isNotFound());
     }
 
@@ -94,9 +97,94 @@ class UserControllerTest {
         when(userService.findByRut("12345678-9"))
                 .thenReturn(Optional.of(sampleUser(1L, "Carlos", "González", "12345678-9")));
 
-        mockMvc.perform(get("/api/v1/usuarios/by-rut/12345678-9"))
+        mockMvc.perform(get("/api/v1/users/by-rut/12345678-9"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rut").value("12345678-9"));
+    }
+
+    @Test
+    void getByEmailReturnsOkWhenFound() throws Exception {
+        when(userService.findByEmail("ana@test.cl"))
+                .thenReturn(Optional.of(sampleUser(1L, "Ana", "Torres", "11111111-1")));
+
+        mockMvc.perform(get("/api/v1/users/by-email").param("email", "ana@test.cl"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("ana@test.cl"));
+    }
+
+    @Test
+    void getByEmailReturnsNotFoundWhenMissing() throws Exception {
+        when(userService.findByEmail("missing@test.cl")).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/v1/users/by-email").param("email", "missing@test.cl"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void searchByNameReturnsOkWhenResultsExist() throws Exception {
+        when(userService.searchByName("ana"))
+                .thenReturn(List.of(sampleUser(1L, "Ana", "Torres", "11111111-1")));
+
+        mockMvc.perform(get("/api/v1/users/buscar").param("q", "ana"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].nombre").value("Ana"));
+    }
+
+    @Test
+    void searchByNameReturnsNoContentWhenEmpty() throws Exception {
+        when(userService.searchByName("zzz")).thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/v1/users/buscar").param("q", "zzz"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void getCatalogoReturnsOkWhenProductsExist() throws Exception {
+        when(userService.getCatalogo()).thenReturn(List.of(new ProductDTO(1L, "Notebook", "SKU-1", 10)));
+
+        mockMvc.perform(get("/api/v1/users/catalogo"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].sku").value("SKU-1"));
+    }
+
+    @Test
+    void getCatalogoReturnsNoContentWhenEmpty() throws Exception {
+        when(userService.getCatalogo()).thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/v1/users/catalogo"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void updateReturnsOkWhenFound() throws Exception {
+        User request = sampleUser(1L, "Ana", "Torres Editado", "11111111-1");
+        when(userService.update(eq(1L), any(User.class))).thenReturn(request);
+
+        mockMvc.perform(put("/api/v1/users/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.apellido").value("Torres Editado"));
+    }
+
+    @Test
+    void updateReturnsNotFoundWhenServiceThrows() throws Exception {
+        User request = sampleUser(99L, "X", "Y", "1-1");
+        when(userService.update(eq(99L), any(User.class)))
+                .thenThrow(new RuntimeException("not found"));
+
+        mockMvc.perform(put("/api/v1/users/99")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getPedidosByUserReturnsNotFoundWhenServiceThrows() throws Exception {
+        when(userService.getOrdersByUser(99L)).thenThrow(new RuntimeException("not found"));
+
+        mockMvc.perform(get("/api/v1/users/99/pedidos"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -105,7 +193,7 @@ class UserControllerTest {
         User saved = sampleUser(5L, "Luis", "Pérez", "33333333-3");
         when(userService.save(any(User.class))).thenReturn(saved);
 
-        mockMvc.perform(post("/api/v1/usuarios")
+        mockMvc.perform(post("/api/v1/users")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -114,7 +202,7 @@ class UserControllerTest {
 
     @Test
     void deleteReturnsNoContent() throws Exception {
-        mockMvc.perform(delete("/api/v1/usuarios/1"))
+        mockMvc.perform(delete("/api/v1/users/1"))
                 .andExpect(status().isNoContent());
 
         verify(userService).delete(1L);
@@ -124,7 +212,7 @@ class UserControllerTest {
     void deleteReturnsNotFoundWhenServiceThrows() throws Exception {
         doThrow(new RuntimeException("not found")).when(userService).delete(99L);
 
-        mockMvc.perform(delete("/api/v1/usuarios/99"))
+        mockMvc.perform(delete("/api/v1/users/99"))
                 .andExpect(status().isNotFound());
     }
 
@@ -134,7 +222,7 @@ class UserControllerTest {
                 new OrderDTO(1L, "Ana Torres", "PENDIENTE", LocalDateTime.now()));
         when(userService.getOrdersByUser(1L)).thenReturn(pedidos);
 
-        mockMvc.perform(get("/api/v1/usuarios/1/pedidos"))
+        mockMvc.perform(get("/api/v1/users/1/pedidos"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].status").value("PENDIENTE"));
     }
