@@ -70,6 +70,29 @@ class RoleServiceTest {
     }
 
     @Test
+    void updateUpdatesRoleWhenExists() {
+        Role role = new Role(1L, "ADMIN", "Administrador");
+        when(roleRepository.existsById(1L)).thenReturn(true);
+        when(roleRepository.save(any(Role.class))).thenReturn(role);
+
+        Role result = roleService.update(1L, role);
+
+        assertEquals(1L, result.getId());
+        verify(roleRepository).save(role);
+    }
+
+    @Test
+    void findByNombreReturnsRoleWhenFound() {
+        Role role = new Role(1L, "ADMIN", "Administrador");
+        when(roleRepository.findByNombre("ADMIN")).thenReturn(Optional.of(role));
+
+        Optional<Role> result = roleService.findByNombre("ADMIN");
+
+        assertTrue(result.isPresent());
+        assertEquals("ADMIN", result.get().getNombre());
+    }
+
+    @Test
     void updateThrowsWhenRoleNotExists() {
         when(roleRepository.existsById(99L)).thenReturn(false);
 
