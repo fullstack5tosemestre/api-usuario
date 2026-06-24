@@ -68,10 +68,11 @@ public class UserService {
         return userRepository.findByEmail(email);
     }
 
-    /** Búsqueda por nombre o apellido (parcial, case-insensitive) */
+    /** Búsqueda por nombre, apellido o RUT (parcial, case-insensitive) */
     public List<User> searchByName(String query) {
         return userRepository
-                .findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCase(query, query);
+                .findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrRutContainingIgnoreCase(
+                        query, query, query);
     }
 
     public User update(Long id, User user) {

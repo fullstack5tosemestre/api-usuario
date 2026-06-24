@@ -106,10 +106,23 @@ class UserServiceTest {
     @Test
     void searchByNameDelegatesToRepository() {
         List<User> users = List.of(sampleUser(1L, "Ana", "Torres", "11111111-1", "ana@test.cl"));
-        when(userRepository.findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCase("ana", "ana"))
+        when(userRepository.findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrRutContainingIgnoreCase(
+                "ana", "ana", "ana"))
                 .thenReturn(users);
 
         List<User> result = userService.searchByName("ana");
+
+        assertEquals(1, result.size());
+    }
+
+    @Test
+    void searchByNameMatchesByRut() {
+        List<User> users = List.of(sampleUser(1L, "Ana", "Torres", "11111111-1", "ana@test.cl"));
+        when(userRepository.findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCaseOrRutContainingIgnoreCase(
+                "11111111-1", "11111111-1", "11111111-1"))
+                .thenReturn(users);
+
+        List<User> result = userService.searchByName("11111111-1");
 
         assertEquals(1, result.size());
     }
