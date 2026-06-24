@@ -42,21 +42,21 @@ jobs:
       - name: Build Docker image
         run: |
           docker build -t usuario:latest .
-          docker tag usuario:latest ${{ secrets.ECR_REPO_URL_API_USUARIO }}:latest
+          docker tag usuario:latest ${{ secrets.ECR_REPO_URL_API_USUARIOS }}:latest
 
       - name: Push image to ECR
         run: |
-          docker push ${{ secrets.ECR_REPO_URL_API_USUARIO }}:latest
+          docker push ${{ secrets.ECR_REPO_URL_API_USUARIOS }}:latest
 
       - name: Render task definition
         env:
-          ECR_REPO_URL_API_USUARIO: ${{ secrets.ECR_REPO_URL_API_USUARIO }}
+          ECR_REPO_URL_API_USUARIOS: ${{ secrets.ECR_REPO_URL_API_USUARIOS }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           RDS_ENDPOINT: ${{ secrets.RDS_ENDPOINT }}
           MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
         run: |
           export LAB_ROLE_ARN="arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/LabRole"
-          envsubst '$ECR_REPO_URL_API_USUARIO $AWS_REGION $RDS_ENDPOINT $MYSQL_ROOT_PASSWORD $LAB_ROLE_ARN' \
+          envsubst '$ECR_REPO_URL_API_USUARIOS $AWS_REGION $RDS_ENDPOINT $MYSQL_ROOT_PASSWORD $LAB_ROLE_ARN' \
             < aws/taskdef-usuario.json > taskdef.json
 
       - name: Register task definition
