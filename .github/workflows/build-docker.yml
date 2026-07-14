@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 env:
-  ECS_CLUSTER: smartlogix-cluster1
+  ECS_CLUSTER: smartlogix-cluster2
   ECS_SERVICE: usuario-service
   TASK_FAMILY: task-usuario
 
